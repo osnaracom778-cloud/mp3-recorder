@@ -10,8 +10,15 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.LibraryMusic
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -39,10 +46,10 @@ import com.eok.mp3recorder.player.PlayerController
 import com.eok.mp3recorder.service.PlaybackService
 import kotlinx.coroutines.flow.filterNotNull
 
-private enum class MainTab(val label: String, val emoji: String) {
-    RECORD("녹음", "🎙"),
-    LIBRARY("라이브러리", "🎵"),
-    PLAYLIST("재생목록", "📃"),
+private enum class MainTab(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
+    RECORD("녹음", Icons.Filled.Mic),
+    LIBRARY("라이브러리", Icons.Filled.LibraryMusic),
+    PLAYLIST("재생목록", Icons.AutoMirrored.Filled.QueueMusic),
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -92,10 +99,11 @@ fun MainScreen() {
                     onClick = { showExitDialog = true },
                     modifier = Modifier.align(Alignment.CenterEnd)
                 ) {
-                    Text(
-                        "✕",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    Icon(
+                        Icons.Filled.Close,
+                        contentDescription = "앱 종료",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(22.dp)
                     )
                 }
             }
@@ -108,7 +116,7 @@ fun MainScreen() {
                         NavigationBarItem(
                             selected = tab == t,
                             onClick = { tab = t },
-                            icon = { Text(t.emoji, style = MaterialTheme.typography.titleLarge) },
+                            icon = { Icon(t.icon, contentDescription = t.label) },
                             label = { Text(t.label) }
                         )
                     }

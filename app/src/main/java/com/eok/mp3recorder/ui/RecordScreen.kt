@@ -19,6 +19,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -40,8 +45,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -49,24 +52,6 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.eok.mp3recorder.audio.RecorderState
-
-/* Material 아이콘 의존성 없이 쓰는 간단한 벡터 아이콘 */
-private val IconMic: ImageVector = ImageVector.Builder(
-    name = "mic", defaultWidth = 24.dp, defaultHeight = 24.dp,
-    viewportWidth = 24f, viewportHeight = 24f
-).apply {
-    path(fill = androidx.compose.ui.graphics.SolidColor(Color.White)) {
-        moveTo(12f, 14f); curveTo(13.66f, 14f, 15f, 12.66f, 15f, 11f)
-        lineTo(15f, 5f); curveTo(15f, 3.34f, 13.66f, 2f, 12f, 2f)
-        curveTo(10.34f, 2f, 9f, 3.34f, 9f, 5f); lineTo(9f, 11f)
-        curveTo(9f, 12.66f, 10.34f, 14f, 12f, 14f); close()
-        moveTo(17f, 11f); curveTo(17f, 13.76f, 14.76f, 16f, 12f, 16f)
-        curveTo(9.24f, 16f, 7f, 13.76f, 7f, 11f); lineTo(5f, 11f)
-        curveTo(5f, 14.53f, 7.61f, 17.43f, 11f, 17.92f); lineTo(11f, 21f)
-        lineTo(13f, 21f); lineTo(13f, 17.92f)
-        curveTo(16.39f, 17.43f, 19f, 14.53f, 19f, 11f); close()
-    }
-}.build()
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -158,14 +143,12 @@ fun RecordScreen(vm: RecordViewModel = viewModel()) {
                 modifier = Modifier.size(96.dp),
                 colors = IconButtonDefaults.filledIconButtonColors(containerColor = buttonColor)
             ) {
-                if (recording) {
-                    Box(
-                        Modifier.size(28.dp).clip(RoundedCornerShape(4.dp)).background(Color.White)
-                    )
-                } else {
-                    Icon(IconMic, contentDescription = "녹음 시작", tint = Color.White,
-                        modifier = Modifier.size(40.dp))
-                }
+                Icon(
+                    if (recording) Icons.Filled.Stop else Icons.Filled.Mic,
+                    contentDescription = if (recording) "정지" else "녹음 시작",
+                    tint = Color.White,
+                    modifier = Modifier.size(44.dp)
+                )
             }
 
             // 일시정지/재개 버튼 (녹음 중에만, 오른쪽에 표시)
@@ -177,10 +160,12 @@ fun RecordScreen(vm: RecordViewModel = viewModel()) {
                         containerColor = MaterialTheme.colorScheme.secondaryContainer
                     )
                 ) {
-                    Text(
-                        if (ui.recorderState == RecorderState.PAUSED) "▶" else "❚❚",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    Icon(
+                        if (ui.recorderState == RecorderState.PAUSED) Icons.Filled.PlayArrow
+                        else Icons.Filled.Pause,
+                        contentDescription = if (ui.recorderState == RecorderState.PAUSED) "재개" else "일시정지",
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.size(32.dp)
                     )
                 }
             }

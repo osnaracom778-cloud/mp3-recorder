@@ -14,9 +14,16 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -118,12 +125,19 @@ fun LibraryScreen(
                 onValueChange = { vm.setQuery(it) },
                 placeholder = { Text("제목·아티스트 검색") },
                 singleLine = true,
-                leadingIcon = { Text("🔍") },
+                leadingIcon = {
+                    Icon(Icons.Filled.Search, contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                },
                 trailingIcon = {
                     if (ui.query.isNotEmpty()) {
-                        IconButton(onClick = { vm.setQuery("") }) { Text("✕") }
+                        IconButton(onClick = { vm.setQuery("") }) {
+                            Icon(Icons.Filled.Close, contentDescription = "지우기",
+                                modifier = Modifier.size(18.dp))
+                        }
                     }
                 },
+                shape = MaterialTheme.shapes.large,
                 modifier = Modifier.weight(1f)
             )
             Box {
@@ -329,7 +343,11 @@ private fun TrackRow(
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (isFavorite) {
-                    Text("♥ ", color = MaterialTheme.colorScheme.error)
+                    Icon(
+                        Icons.Filled.Favorite, contentDescription = "즐겨찾기",
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(14.dp).padding(end = 2.dp)
+                    )
                 }
                 Text(
                     text = track.title,
@@ -357,7 +375,10 @@ private fun TrackRow(
         }
         Box {
             var menuOpen by remember { mutableStateOf(false) }
-            IconButton(onClick = { menuOpen = true }) { Text("⋮", style = MaterialTheme.typography.titleLarge) }
+            IconButton(onClick = { menuOpen = true }) {
+                Icon(Icons.Filled.MoreVert, contentDescription = "메뉴",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                 DropdownMenuItem(
                     text = { Text(if (isFavorite) "즐겨찾기 해제" else "즐겨찾기 ♥") },

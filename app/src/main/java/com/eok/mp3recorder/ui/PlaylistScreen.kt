@@ -10,7 +10,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -88,8 +95,9 @@ private fun PlaylistListView(vm: PlaylistViewModel) {
                         .clickable { vm.open(PlaylistViewModel.FAVORITES_ID) }
                         .padding(horizontal = 16.dp, vertical = 14.dp)
                 ) {
-                    Text("♥", color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.titleMedium)
+                    Icon(Icons.Filled.Favorite, contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(22.dp))
                     Text(
                         "즐겨찾기",
                         style = MaterialTheme.typography.bodyLarge,
@@ -109,7 +117,9 @@ private fun PlaylistListView(vm: PlaylistViewModel) {
                         .clickable { vm.open(playlist.id) }
                         .padding(start = 16.dp, end = 4.dp, top = 6.dp, bottom = 6.dp)
                 ) {
-                    Text("📃", style = MaterialTheme.typography.titleMedium)
+                    Icon(Icons.AutoMirrored.Filled.QueueMusic, contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(22.dp))
                     Text(
                         playlist.name,
                         style = MaterialTheme.typography.bodyLarge,
@@ -121,7 +131,8 @@ private fun PlaylistListView(vm: PlaylistViewModel) {
                     Box {
                         var menuOpen by remember { mutableStateOf(false) }
                         IconButton(onClick = { menuOpen = true }) {
-                            Text("⋮", style = MaterialTheme.typography.titleLarge)
+                            Icon(Icons.Filled.MoreVert, contentDescription = "메뉴",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                             DropdownMenuItem(text = { Text("이름 변경") },
@@ -242,7 +253,7 @@ private fun PlaylistDetailView(vm: PlaylistViewModel, onOpenPlayer: () -> Unit) 
             modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 8.dp)
         ) {
             IconButton(onClick = { vm.closeDetail() }) {
-                Text("←", style = MaterialTheme.typography.titleLarge)
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "뒤로")
             }
             Text(
                 title,
@@ -303,7 +314,8 @@ private fun PlaylistDetailView(vm: PlaylistViewModel, onOpenPlayer: () -> Unit) 
                         Box {
                             var menuOpen by remember { mutableStateOf(false) }
                             IconButton(onClick = { menuOpen = true }) {
-                                Text("⋮", style = MaterialTheme.typography.titleLarge)
+                                Icon(Icons.Filled.MoreVert, contentDescription = "메뉴",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                                 if (!isFavorites) {

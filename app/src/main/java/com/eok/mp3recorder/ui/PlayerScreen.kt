@@ -8,8 +8,23 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Forward10
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.RepeatOne
+import androidx.compose.material.icons.filled.Replay10
+import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -75,8 +90,28 @@ fun PlayerScreen() {
         modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // 곡 정보
-        Text("🎵", style = MaterialTheme.typography.displayMedium)
+        // 앨범아트 자리 (그라데이션 카드)
+        Box(
+            modifier = Modifier
+                .size(120.dp)
+                .background(
+                    brush = androidx.compose.ui.graphics.Brush.linearGradient(
+                        listOf(
+                            MaterialTheme.colorScheme.primaryContainer,
+                            MaterialTheme.colorScheme.surfaceVariant,
+                        )
+                    ),
+                    shape = RoundedCornerShape(28.dp)
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                Icons.Filled.MusicNote,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(56.dp)
+            )
+        }
         Text(
             text = track.title,
             style = MaterialTheme.typography.titleLarge,
@@ -141,25 +176,30 @@ fun PlayerScreen() {
             modifier = Modifier.padding(top = 8.dp)
         ) {
             IconButton(onClick = { PlayerController.previous() }) {
-                Text("⏮", style = MaterialTheme.typography.headlineSmall)
+                Icon(Icons.Filled.SkipPrevious, contentDescription = "이전 곡",
+                    modifier = Modifier.size(32.dp))
             }
             IconButton(onClick = { PlayerController.skipBack() }) {
-                Text("-10", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Icon(Icons.Filled.Replay10, contentDescription = "10초 뒤로",
+                    modifier = Modifier.size(28.dp))
             }
             FilledIconButton(
                 onClick = { PlayerController.togglePlayPause() },
-                modifier = Modifier.size(72.dp)
+                modifier = Modifier.size(76.dp)
             ) {
-                Text(
-                    if (isPlaying) "❚❚" else "▶",
-                    style = MaterialTheme.typography.headlineMedium
+                Icon(
+                    if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    contentDescription = if (isPlaying) "일시정지" else "재생",
+                    modifier = Modifier.size(40.dp)
                 )
             }
             IconButton(onClick = { PlayerController.skipForward() }) {
-                Text("+10", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Icon(Icons.Filled.Forward10, contentDescription = "10초 앞으로",
+                    modifier = Modifier.size(28.dp))
             }
             IconButton(onClick = { PlayerController.next() }) {
-                Text("⏭", style = MaterialTheme.typography.headlineSmall)
+                Icon(Icons.Filled.SkipNext, contentDescription = "다음 곡",
+                    modifier = Modifier.size(32.dp))
             }
         }
 
@@ -171,24 +211,23 @@ fun PlayerScreen() {
         ) {
             // 반복: 없음 → 전체 → 한 곡
             TextButton(onClick = { PlayerController.cycleRepeatMode() }) {
-                val (label, active) = when (repeatMode) {
-                    Player.REPEAT_MODE_ALL -> "🔁 전체" to true
-                    Player.REPEAT_MODE_ONE -> "🔂 한곡" to true
-                    else -> "🔁 반복" to false
+                val (icon, label, active) = when (repeatMode) {
+                    Player.REPEAT_MODE_ALL -> Triple(Icons.Filled.Repeat, "전체", true)
+                    Player.REPEAT_MODE_ONE -> Triple(Icons.Filled.RepeatOne, "한곡", true)
+                    else -> Triple(Icons.Filled.Repeat, "반복", false)
                 }
-                Text(
-                    label,
-                    color = if (active) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                val tint = if (active) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.onSurfaceVariant
+                Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(18.dp))
+                Text(" $label", color = tint)
             }
             // 셔플
             TextButton(onClick = { PlayerController.toggleShuffle() }) {
-                Text(
-                    "🔀 셔플",
-                    color = if (shuffle) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                val tint = if (shuffle) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.onSurfaceVariant
+                Icon(Icons.Filled.Shuffle, contentDescription = null, tint = tint,
+                    modifier = Modifier.size(18.dp))
+                Text(" 셔플", color = tint)
             }
             // A-B 구간 반복
             TextButton(onClick = { PlayerController.toggleAbLoop() }) {
@@ -219,17 +258,18 @@ fun PlayerScreen() {
             Box {
                 var menuOpen by remember { mutableStateOf(false) }
                 TextButton(onClick = { menuOpen = true }) {
-                    val label = when {
-                        sleepRemaining != null ->
-                            "⏱ ${formatDuration(sleepRemaining!!)}"
-                        sleepAfterTrack -> "⏱ 곡 끝"
-                        else -> "⏱ 슬립"
-                    }
+                    val tint = if (sleepRemaining != null || sleepAfterTrack)
+                        MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant
+                    Icon(Icons.Outlined.Timer, contentDescription = null, tint = tint,
+                        modifier = Modifier.size(18.dp))
                     Text(
-                        label,
-                        color = if (sleepRemaining != null || sleepAfterTrack)
-                            MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.onSurfaceVariant
+                        when {
+                            sleepRemaining != null -> " ${formatDuration(sleepRemaining!!)}"
+                            sleepAfterTrack -> " 곡 끝"
+                            else -> " 슬립"
+                        },
+                        color = tint
                     )
                 }
                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
