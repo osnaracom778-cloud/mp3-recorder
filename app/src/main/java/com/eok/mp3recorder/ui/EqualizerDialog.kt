@@ -30,6 +30,11 @@ import com.eok.mp3recorder.player.EqualizerManager
 fun EqualizerDialog(onDismiss: () -> Unit) {
     val st by EqualizerManager.state.collectAsState()
 
+    // 초기화가 안 된 채 열렸으면 재시도 (기기별 이펙트 초기화 실패 대비)
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        EqualizerManager.retryAttach()
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {

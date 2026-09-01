@@ -42,6 +42,7 @@ object EqualizerManager {
     private var equalizer: Equalizer? = null
     private var bassBoost: BassBoost? = null
     private var appContext: Context? = null
+    private var lastSessionId: Int = 0
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     private val _state = MutableStateFlow(EqState())
@@ -50,6 +51,7 @@ object EqualizerManager {
     fun attach(context: Context, audioSessionId: Int) {
         if (audioSessionId == 0) return
         appContext = context.applicationContext
+        lastSessionId = audioSessionId
         releaseEffects()
         try {
             val eq = Equalizer(0, audioSessionId)
@@ -159,6 +161,14 @@ object EqualizerManager {
                     bassStrength = s.bassStrength,
                 )
             )
+        }
+    }
+
+    /** EQ 다이얼로그를 열 때 호출 — 초기화가 안 된 상태면 마지막 세션으로 재시도 */
+    fun retryAttach() {
+        val ctx = appContext ?: return
+        if (equalizer == null && lastSessionId != 0) {
+            attach(ctx, lastSessionId)
         }
     }
 

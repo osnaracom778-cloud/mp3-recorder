@@ -206,11 +206,11 @@ fun PlayerScreen() {
             }
         }
 
-        // 보조 컨트롤: 반복 | 셔플 | A-B | 배속 | 슬립
+        // 보조 컨트롤 1줄: 반복 | 셔플 | A-B | 배속
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceEvenly,
-            modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 24.dp)
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
         ) {
             // 반복: 없음 → 전체 → 한 곡
             TextButton(onClick = { PlayerController.cycleRepeatMode() }) {
@@ -257,14 +257,20 @@ fun PlayerScreen() {
                     else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            // 이퀄라이저
-            IconButton(onClick = { showEq = true }) {
-                Icon(
-                    Icons.Filled.GraphicEq,
-                    contentDescription = "이퀄라이저",
-                    tint = if (eqState.ready && eqState.enabled) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.onSurfaceVariant
-                )
+        }
+
+        // 보조 컨트롤 2줄: 이퀄라이저 | 슬립 타이머
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)
+        ) {
+            TextButton(onClick = { showEq = true }) {
+                val tint = if (eqState.ready && eqState.enabled) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.onSurfaceVariant
+                Icon(Icons.Filled.GraphicEq, contentDescription = null, tint = tint,
+                    modifier = Modifier.size(18.dp))
+                Text(" 이퀄라이저", color = tint)
             }
             // 슬립 타이머
             Box {
