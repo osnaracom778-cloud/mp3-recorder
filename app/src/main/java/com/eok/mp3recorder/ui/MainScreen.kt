@@ -62,10 +62,20 @@ fun MainScreen() {
 
     var tab by rememberSaveable { mutableStateOf(MainTab.RECORD) }
     var showPlayer by rememberSaveable { mutableStateOf(false) }
+    var playerRequested by rememberSaveable { mutableStateOf(false) }
     var showExitDialog by rememberSaveable { mutableStateOf(false) }
 
     val nowPlaying by PlayerController.nowPlaying.collectAsState()
     val recorderState by RecordingController.state.collectAsState()
+
+    // 곡을 탭한 직후에는 재생 정보가 아직 없을 수 있다 —
+    // nowPlaying이 준비된 뒤에 팝업을 열어야 시트가 헛돌지 않는다 (콜드 스타트 경합 방지)
+    LaunchedEffect(playerRequested, nowPlaying) {
+        if (playerRequested && nowPlaying != null) {
+            showPlayer = true
+            playerRequested = false
+        }
+    }
 
     // 녹음 저장이 완료되면 라이브러리(내 녹음) 탭으로 이동해 새 파일을 선택 표시
     LaunchedEffect(Unit) {
@@ -127,8 +137,8 @@ fun MainScreen() {
         Column(Modifier.fillMaxSize().padding(innerPadding)) {
             when (tab) {
                 MainTab.RECORD -> RecordScreen()
-                MainTab.LIBRARY -> LibraryScreen(onOpenPlayer = { showPlayer = true })
-                MainTab.PLAYLIST -> PlaylistScreen(onOpenPlayer = { showPlayer = true })
+                MainTab.LIBRARY -> LibraryScreen(onOpenPlayer = { playerRequested = true })
+                MainTab.PLAYLIST -> PlaylistScreen(onOpenPlayer = { playerRequested = true })
             }
         }
     }

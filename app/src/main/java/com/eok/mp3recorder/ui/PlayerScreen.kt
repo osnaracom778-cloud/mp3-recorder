@@ -12,6 +12,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Forward10
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -63,6 +64,8 @@ fun PlayerScreen() {
     val abLoop by PlayerController.abLoop.collectAsState()
     val sleepRemaining by PlayerController.sleepRemainingMs.collectAsState()
     val sleepAfterTrack by PlayerController.sleepAfterTrack.collectAsState()
+    val eqState by com.eok.mp3recorder.player.EqualizerManager.state.collectAsState()
+    var showEq by remember { mutableStateOf(false) }
 
     val track = nowPlaying ?: run {
         Box(Modifier.fillMaxWidth().padding(32.dp), Alignment.Center) {
@@ -254,6 +257,15 @@ fun PlayerScreen() {
                     else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+            // 이퀄라이저
+            IconButton(onClick = { showEq = true }) {
+                Icon(
+                    Icons.Filled.GraphicEq,
+                    contentDescription = "이퀄라이저",
+                    tint = if (eqState.ready && eqState.enabled) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             // 슬립 타이머
             Box {
                 var menuOpen by remember { mutableStateOf(false) }
@@ -299,6 +311,10 @@ fun PlayerScreen() {
                 }
             }
         }
+    }
+
+    if (showEq) {
+        EqualizerDialog(onDismiss = { showEq = false })
     }
 }
 

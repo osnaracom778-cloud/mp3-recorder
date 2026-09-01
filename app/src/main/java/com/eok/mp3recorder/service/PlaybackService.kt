@@ -4,10 +4,12 @@ import android.app.PendingIntent
 import android.content.Intent
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
+import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.eok.mp3recorder.MainActivity
+import com.eok.mp3recorder.player.EqualizerManager
 
 /**
  * Media3 기반 재생 서비스.
@@ -32,6 +34,16 @@ class PlaybackService : MediaSessionService() {
             .setHandleAudioBecomingNoisy(true)  // 이어폰 분리 시 자동 일시정지
             .build()
 
+        // 이퀄라이저를 오디오 세션에 연결 (세션이 바뀌면 다시 연결)
+        player.addListener(object : Player.Listener {
+            override fun onAudioSessionIdChanged(audioSessionId: Int) {
+                EqualizerManager.attach(this@PlaybackService, audioSessionId)
+            }
+        })
+        if (player.audioSessionId != C.AUDIO_SESSION_ID_UNSET) {
+            EqualizerManager.attach(this, player.audioSessionId)
+        }
+
         val sessionActivity = PendingIntent.getActivity(
             this, 0, Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
@@ -54,6 +66,7 @@ class PlaybackService : MediaSessionService() {
     }
 
     override fun onDestroy() {
+        EqualizerManager.release()
         mediaSession?.run {
             player.release()
             release()

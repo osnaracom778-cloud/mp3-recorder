@@ -75,6 +75,11 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
     val playlists = dao.playlistsWithCount()
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
+    /** 기기 내 오디오 폴더 목록 (파일 이동 대상 선택용) */
+    val folders: StateFlow<List<String>> = allTracks
+        .map { tracks -> tracks.map { it.relativePath }.distinct().sorted() }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
     val uiState: StateFlow<LibraryUiState> = combine(
         combine(allTracks, loading, filter) { t, l, f -> Triple(t, l, f) },
         combine(sort, query, favoriteIds) { s, q, fav -> Triple(s, q, fav) },
@@ -166,6 +171,23 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
                 }
             } catch (e: Exception) {
                 toast("삭제 실패: ${e.message}")
+            }
+        }
+    }
+
+    /** 다른 폴더로 이동. [relativePath] 예: "Music/회의녹음" */
+    fun moveToFolder(track: AudioTrack, relativePath: String) {
+        val target = relativePath.trim()
+        if (target.isEmpty()) return
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                MediaOps.move(getApplication(), track, target)
+                refresh()
+                toast("이동 완료: $target")
+            } catch (e: SecurityException) {
+                toast("다른 앱이 만든 파일은 이동할 수 없습니다")
+            } catch (e: Exception) {
+                toast("이동 실패: ${e.message}")
             }
         }
     }

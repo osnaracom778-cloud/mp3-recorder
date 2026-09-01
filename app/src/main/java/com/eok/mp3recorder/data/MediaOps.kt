@@ -45,6 +45,20 @@ object MediaOps {
         }
     }
 
+    /**
+     * 다른 폴더로 이동 (RELATIVE_PATH 변경 — MediaStore가 실제 파일도 옮긴다).
+     * 이 앱이 만든 파일(내 녹음)만 바로 성공하며, 다른 앱 파일은 SecurityException.
+     * [newRelativePath] 예: "Music/회의녹음"
+     */
+    fun move(context: Context, track: AudioTrack, newRelativePath: String) {
+        val normalized = newRelativePath.trim().trim('/') + "/"
+        val values = ContentValues().apply {
+            put(MediaStore.Audio.Media.RELATIVE_PATH, normalized)
+        }
+        val updated = context.contentResolver.update(track.contentUri, values, null, null)
+        if (updated <= 0) throw IllegalStateException("이동하지 못했습니다")
+    }
+
     /** 공유 시트 열기 (카톡·이메일 등) */
     fun share(context: Context, track: AudioTrack) {
         val send = Intent(Intent.ACTION_SEND).apply {

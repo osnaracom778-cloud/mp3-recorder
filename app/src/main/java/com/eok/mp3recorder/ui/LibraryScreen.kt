@@ -46,6 +46,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -113,6 +114,7 @@ fun LibraryScreen(
     var deleteTarget by remember { mutableStateOf<AudioTrack?>(null) }
     var infoTarget by remember { mutableStateOf<AudioTrack?>(null) }
     var playlistTarget by remember { mutableStateOf<AudioTrack?>(null) }
+    var moveTarget by remember { mutableStateOf<AudioTrack?>(null) }
 
     Column(Modifier.fillMaxSize()) {
         // 검색 + 정렬
@@ -196,6 +198,7 @@ fun LibraryScreen(
                             onToggleFavorite = { vm.toggleFavorite(track) },
                             onAddToPlaylist = { playlistTarget = track },
                             onRename = { renameTarget = track },
+                            onMove = { moveTarget = track },
                             onShare = { vm.share(track) },
                             onDelete = { deleteTarget = track },
                             onInfo = { infoTarget = track },
@@ -210,18 +213,78 @@ fun LibraryScreen(
     // ---- 다이얼로그들 ----
 
     renameTarget?.let { track ->
-        var name by remember(track.id) { mutableStateOf(track.title) }
+        var name by remember(track.id) { mutableStateOf("") }
+        val focusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
         AlertDialog(
             onDismissRequest = { renameTarget = null },
             title = { Text("이름 변경") },
             text = {
-                OutlinedTextField(value = name, onValueChange = { name = it }, singleLine = true)
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    singleLine = true,
+                    placeholder = { Text(track.title) },   // 기존 이름은 힌트로만 표시
+                    modifier = Modifier.focusRequester(focusRequester)
+                )
+                // 다이얼로그가 뜨면 바로 입력칸에 커서 + 키보드
+                LaunchedEffect(track.id) { focusRequester.requestFocus() }
             },
             confirmButton = {
-                Button(onClick = { vm.rename(track, name); renameTarget = null }) { Text("변경") }
+                Button(
+                    onClick = { vm.rename(track, name); renameTarget = null },
+                    enabled = name.isNotBlank()
+                ) { Text("변경") }
             },
             dismissButton = {
                 TextButton(onClick = { renameTarget = null }) { Text("취소") }
+            }
+        )
+    }
+
+    moveTarget?.let { track ->
+        val folders by vm.folders.collectAsState()
+        var newFolder by remember(track.id) { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { moveTarget = null },
+            title = { Text("폴더로 이동") },
+            text = {
+                Column {
+                    Text("'${track.title}' 파일을 옮길 폴더를 선택하세요.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    folders.filter { it != track.relativePath }.forEach { folder ->
+                        Text(
+                            text = "📁 ${folder.trimEnd('/')}",
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    vm.moveToFolder(track, folder)
+                                    moveTarget = null
+                                }
+                                .padding(vertical = 10.dp)
+                        )
+                    }
+                    HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                    OutlinedTextField(
+                        value = newFolder,
+                        onValueChange = { newFolder = it },
+                        singleLine = true,
+                        placeholder = { Text("새 폴더 이름 (음악 폴더 아래 생성)") },
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        vm.moveToFolder(track, "Music/${newFolder.trim()}")
+                        moveTarget = null
+                    },
+                    enabled = newFolder.isNotBlank()
+                ) { Text("새 폴더로 이동") }
+            },
+            dismissButton = {
+                TextButton(onClick = { moveTarget = null }) { Text("취소") }
             }
         )
     }
@@ -325,6 +388,7 @@ private fun TrackRow(
     onToggleFavorite: () -> Unit,
     onAddToPlaylist: () -> Unit,
     onRename: () -> Unit,
+    onMove: () -> Unit,
     onShare: () -> Unit,
     onDelete: () -> Unit,
     onInfo: () -> Unit,
@@ -387,6 +451,8 @@ private fun TrackRow(
                     onClick = { onAddToPlaylist(); menuOpen = false })
                 DropdownMenuItem(text = { Text("이름 변경") },
                     onClick = { onRename(); menuOpen = false })
+                DropdownMenuItem(text = { Text("폴더로 이동") },
+                    onClick = { onMove(); menuOpen = false })
                 DropdownMenuItem(text = { Text("공유") },
                     onClick = { onShare(); menuOpen = false })
                 DropdownMenuItem(text = { Text("삭제") },
