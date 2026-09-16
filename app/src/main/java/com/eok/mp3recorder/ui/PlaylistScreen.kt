@@ -120,13 +120,23 @@ private fun PlaylistListView(vm: PlaylistViewModel) {
                     Icon(Icons.AutoMirrored.Filled.QueueMusic, contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(22.dp))
-                    Text(
-                        playlist.name,
-                        style = MaterialTheme.typography.bodyLarge,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f).padding(start = 12.dp)
-                    )
+                    Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                        Text(
+                            playlist.name,
+                            style = MaterialTheme.typography.bodyLarge,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (playlist.folderPath != null) {
+                            Text(
+                                "📁 ${playlist.folderPath.trimEnd('/')} · 자동 동기화",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
                     Text("${playlist.trackCount}곡", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Box {
                         var menuOpen by remember { mutableStateOf(false) }

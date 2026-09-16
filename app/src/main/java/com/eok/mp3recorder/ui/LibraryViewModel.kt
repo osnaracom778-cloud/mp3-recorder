@@ -175,19 +175,25 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** 다른 폴더로 이동. [relativePath] 예: "Music/회의녹음" */
-    fun moveToFolder(track: AudioTrack, relativePath: String) {
+    /**
+     * 다른 폴더로 이동. [relativePath] 예: "Music/회의녹음"
+     * 복사 방식으로 이동된 경우 재생목록/즐겨찾기 참조를 새 ID로 갱신한다.
+     * 원본 삭제에 시스템 승인이 필요하면 [onNeedConfirm]으로 IntentSender를 넘긴다.
+     */
+    fun moveToFolder(track: AudioTrack, relativePath: String, onNeedConfirm: (IntentSender) -> Unit) {
         val target = relativePath.trim()
         if (target.isEmpty()) return
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                MediaOps.move(getApplication(), track, target)
+                val result = MediaOps.move(getApplication(), track, target)
+                result.newMediaId?.let { newId -> dao.remapMediaId(track.id, newId) }
                 refresh()
-                toast("이동 완료: $target")
-            } catch (e: SecurityException) {
-                toast("다른 앱이 만든 파일은 이동할 수 없습니다")
+                toast("이동 완료: ${target.trimEnd('/')}")
+                result.pendingDelete?.let { sender ->
+                    withContext(Dispatchers.Main) { onNeedConfirm(sender) }
+                }
             } catch (e: Exception) {
-                toast("이동 실패: ${e.message}")
+                toast("이동 실패: ${e.message ?: e.javaClass.simpleName}")
             }
         }
     }

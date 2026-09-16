@@ -58,6 +58,10 @@ fun MainScreen() {
     val context = LocalContext.current
     LaunchedEffect(Unit) {
         PlayerController.connect(context)
+        // 앱 실행 시 폴더 연결 재생목록에 새 파일 자동 추가
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching { com.eok.mp3recorder.data.PlaylistSync.syncFolders(context) }
+        }
     }
 
     var tab by rememberSaveable { mutableStateOf(MainTab.RECORD) }

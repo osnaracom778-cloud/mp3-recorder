@@ -36,6 +36,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -44,6 +45,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
@@ -172,21 +174,26 @@ fun RecordScreen(vm: RecordViewModel = viewModel()) {
         }
     }
 
-    // 저장 다이얼로그
+    // 저장 다이얼로그 — 빈칸에 바로 입력, 비워 두면 추천 이름으로 저장
     ui.saveDialogDefaultName?.let { defaultName ->
-        var name by remember(defaultName) { mutableStateOf(defaultName) }
+        var name by remember(defaultName) { mutableStateOf("") }
+        val focusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
         AlertDialog(
             onDismissRequest = { /* 실수 방지: 버튼으로만 닫기 */ },
             title = { Text("녹음 저장") },
             text = {
                 Column {
-                    Text("파일 이름을 입력하세요. (음악/MP3녹음기 폴더에 저장)")
+                    Text("파일 이름을 입력하세요. 비워 두면 추천 이름으로 저장됩니다.\n(음악/MP3녹음기 폴더)")
                     OutlinedTextField(
                         value = name,
                         onValueChange = { name = it },
                         singleLine = true,
-                        modifier = Modifier.padding(top = 12.dp)
+                        placeholder = { Text(defaultName) },
+                        modifier = Modifier
+                            .padding(top = 12.dp)
+                            .focusRequester(focusRequester)
                     )
+                    LaunchedEffect(defaultName) { focusRequester.requestFocus() }
                     if (ui.busySaving) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -199,7 +206,10 @@ fun RecordScreen(vm: RecordViewModel = viewModel()) {
                 }
             },
             confirmButton = {
-                Button(onClick = { vm.saveRecording(name) }, enabled = !ui.busySaving) {
+                Button(
+                    onClick = { vm.saveRecording(name.ifBlank { defaultName }) },
+                    enabled = !ui.busySaving
+                ) {
                     Text("저장")
                 }
             },

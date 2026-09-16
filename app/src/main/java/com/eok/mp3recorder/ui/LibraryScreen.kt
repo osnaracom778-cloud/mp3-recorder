@@ -116,6 +116,14 @@ fun LibraryScreen(
     var playlistTarget by remember { mutableStateOf<AudioTrack?>(null) }
     var moveTarget by remember { mutableStateOf<AudioTrack?>(null) }
 
+    // 입력창이 있는 다이얼로그가 닫히면 포커스가 검색창으로 튀어 키보드가 남는다 → 포커스 해제
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+    LaunchedEffect(renameTarget, moveTarget, playlistTarget) {
+        if (renameTarget == null && moveTarget == null && playlistTarget == null) {
+            focusManager.clearFocus()
+        }
+    }
+
     Column(Modifier.fillMaxSize()) {
         // 검색 + 정렬
         Row(
@@ -259,7 +267,11 @@ fun LibraryScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable {
-                                    vm.moveToFolder(track, folder)
+                                    vm.moveToFolder(track, folder) { sender ->
+                                        deleteConfirmLauncher.launch(
+                                            androidx.activity.result.IntentSenderRequest.Builder(sender).build()
+                                        )
+                                    }
                                     moveTarget = null
                                 }
                                 .padding(vertical = 10.dp)
@@ -277,7 +289,11 @@ fun LibraryScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        vm.moveToFolder(track, "Music/${newFolder.trim()}")
+                        vm.moveToFolder(track, "Music/${newFolder.trim()}") { sender ->
+                            deleteConfirmLauncher.launch(
+                                androidx.activity.result.IntentSenderRequest.Builder(sender).build()
+                            )
+                        }
                         moveTarget = null
                     },
                     enabled = newFolder.isNotBlank()

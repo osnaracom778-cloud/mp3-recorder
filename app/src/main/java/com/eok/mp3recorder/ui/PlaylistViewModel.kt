@@ -88,16 +88,22 @@ class PlaylistViewModel(app: Application) : AndroidViewModel(app) {
             }
             .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
+    /** 라이브러리 재조회 + 폴더 연결 재생목록 자동 동기화 */
     fun refreshTracks() {
         viewModelScope.launch(Dispatchers.IO) {
-            allTracks.value = AudioLibrary.query(getApplication())
+            val tracks = AudioLibrary.query(getApplication())
+            allTracks.value = tracks
+            com.eok.mp3recorder.data.PlaylistSync.syncFolders(getApplication(), tracks)
         }
     }
 
     fun open(playlistId: Long) { selected.value = playlistId }
     fun closeDetail() { selected.value = null }
 
-    /** 폴더의 모든 곡을 새 재생목록으로 가져온다 (재생목록 이름 = 폴더 이름) */
+    /**
+     * 폴더의 모든 곡을 새 재생목록으로 가져온다 (재생목록 이름 = 폴더 이름).
+     * 폴더 경로를 기억해 두어 이후 앱 실행 시 새 파일이 자동으로 추가된다.
+     */
     fun importFolder(folder: FolderInfo) {
         viewModelScope.launch(Dispatchers.IO) {
             val tracks = allTracks.value
@@ -105,7 +111,11 @@ class PlaylistViewModel(app: Application) : AndroidViewModel(app) {
                 .sortedBy { it.title.lowercase() }
             if (tracks.isEmpty()) return@launch
             val id = dao.createPlaylist(
-                PlaylistEntity(name = folder.displayName, createdAt = System.currentTimeMillis())
+                PlaylistEntity(
+                    name = folder.displayName,
+                    createdAt = System.currentTimeMillis(),
+                    folderPath = folder.path,
+                )
             )
             tracks.forEach { dao.addToPlaylist(id, it.id) }
         }
