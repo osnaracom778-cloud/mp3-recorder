@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
@@ -278,23 +280,21 @@ fun LibraryScreen(
             onDismissRequest = { moveTarget = null },
             title = { Text("폴더로 이동") },
             text = {
-                Column {
-                    Text("'${track.title}' 파일을 옮길 폴더를 선택하세요.\n(표준 음악 폴더 밖은 '직접 선택'으로)",
+                // 글꼴을 키운 화면에서도 잘리지 않도록 스크롤 가능
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    // 가장 먼저 보여야 하는 항목: 아무 폴더나 고르는 시스템 선택 창
+                    Button(
+                        onClick = {
+                            vm.beginTreeMove(track)
+                            moveTarget = null
+                            folderPickerLauncher.launch(null)
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("📂 다른 폴더 직접 선택…") }
+                    Text("'${track.title}' 파일을 옮길 폴더를 선택하세요.",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    folders.filter { it != track.relativePath }.forEach { folder ->
-                        Text(
-                            text = "📁 ${folder.trimEnd('/')}",
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    vm.moveToFolder(track, folder, requestWrite, requestDelete)
-                                    moveTarget = null
-                                }
-                                .padding(vertical = 10.dp)
-                        )
-                    }
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 8.dp))
                     // 직접 선택했던 폴더들 (표준 폴더 밖 포함)
                     customFolders.forEach { folder ->
                         Row(
@@ -318,14 +318,20 @@ fun LibraryScreen(
                             }
                         }
                     }
-                    TextButton(
-                        onClick = {
-                            vm.beginTreeMove(track)
-                            moveTarget = null
-                            folderPickerLauncher.launch(null)
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) { Text("📂 다른 폴더 직접 선택…") }
+                    // 표준 음악 폴더들
+                    folders.filter { it != track.relativePath }.forEach { folder ->
+                        Text(
+                            text = "📁 ${folder.trimEnd('/')}",
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    vm.moveToFolder(track, folder, requestWrite, requestDelete)
+                                    moveTarget = null
+                                }
+                                .padding(vertical = 10.dp)
+                        )
+                    }
                     HorizontalDivider(Modifier.padding(vertical = 8.dp))
                     OutlinedTextField(
                         value = newFolder,
