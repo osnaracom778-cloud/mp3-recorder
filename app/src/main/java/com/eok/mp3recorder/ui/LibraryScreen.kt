@@ -103,6 +103,13 @@ fun LibraryScreen(
         deleteConfirmLauncher.launch(androidx.activity.result.IntentSenderRequest.Builder(sender).build())
     }
 
+    // 시스템 폴더 선택 창 (표준 폴더 밖으로 이동할 때)
+    val folderPickerLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree()
+    ) { treeUri ->
+        vm.onTreePicked(treeUri, requestDelete)
+    }
+
     LaunchedEffect(permissionGranted) {
         if (permissionGranted) vm.refresh()
     }
@@ -265,13 +272,14 @@ fun LibraryScreen(
 
     moveTarget?.let { track ->
         val folders by vm.folders.collectAsState()
+        val customFolders by vm.customFolders.collectAsState()
         var newFolder by remember(track.id) { mutableStateOf("") }
         AlertDialog(
             onDismissRequest = { moveTarget = null },
             title = { Text("폴더로 이동") },
             text = {
                 Column {
-                    Text("'${track.title}' 파일을 옮길 폴더를 선택하세요.\n(표준 음악 폴더 아래로만 이동할 수 있습니다)",
+                    Text("'${track.title}' 파일을 옮길 폴더를 선택하세요.\n(표준 음악 폴더 밖은 '직접 선택'으로)",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                     folders.filter { it != track.relativePath }.forEach { folder ->
@@ -287,6 +295,37 @@ fun LibraryScreen(
                                 .padding(vertical = 10.dp)
                         )
                     }
+                    // 직접 선택했던 폴더들 (표준 폴더 밖 포함)
+                    customFolders.forEach { folder ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    vm.moveToTree(track, folder.uri, requestDelete)
+                                    moveTarget = null
+                                }
+                        ) {
+                            Text(
+                                text = "📂 ${folder.name}",
+                                style = MaterialTheme.typography.bodyLarge,
+                                modifier = Modifier.weight(1f).padding(vertical = 10.dp)
+                            )
+                            IconButton(onClick = { vm.forgetCustomFolder(folder) }) {
+                                Icon(Icons.Filled.Close, contentDescription = "목록에서 제거",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(16.dp))
+                            }
+                        }
+                    }
+                    TextButton(
+                        onClick = {
+                            vm.beginTreeMove(track)
+                            moveTarget = null
+                            folderPickerLauncher.launch(null)
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("📂 다른 폴더 직접 선택…") }
                     HorizontalDivider(Modifier.padding(vertical = 8.dp))
                     OutlinedTextField(
                         value = newFolder,

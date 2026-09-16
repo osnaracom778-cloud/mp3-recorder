@@ -7,9 +7,12 @@ import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.media3.common.Player
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 
 /** 재생 설정(반복/셔플/배속)과 곡별 이어듣기 위치를 저장한다. */
 object PlayerPrefs {
@@ -81,6 +84,25 @@ object PlayerPrefs {
             it[KEY_EQ_PRESET] = settings.presetIndex
             it[KEY_EQ_BANDS] = settings.bandLevels?.joinToString(",") ?: ""
             it[KEY_EQ_BASS] = settings.bassStrength
+        }
+    }
+
+    // ---- 직접 선택한 이동 대상 폴더 (SAF 트리 URI) ----
+
+    private val KEY_CUSTOM_FOLDERS = stringSetPreferencesKey("custom_folder_trees")
+
+    fun customFoldersFlow(context: Context): Flow<Set<String>> =
+        context.store.data.map { it[KEY_CUSTOM_FOLDERS] ?: emptySet() }
+
+    suspend fun addCustomFolder(context: Context, treeUri: String) {
+        context.store.edit {
+            it[KEY_CUSTOM_FOLDERS] = (it[KEY_CUSTOM_FOLDERS] ?: emptySet()) + treeUri
+        }
+    }
+
+    suspend fun removeCustomFolder(context: Context, treeUri: String) {
+        context.store.edit {
+            it[KEY_CUSTOM_FOLDERS] = (it[KEY_CUSTOM_FOLDERS] ?: emptySet()) - treeUri
         }
     }
 

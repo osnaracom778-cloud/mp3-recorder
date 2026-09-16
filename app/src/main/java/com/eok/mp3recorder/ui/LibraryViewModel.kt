@@ -85,6 +85,77 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
         }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
+    /** 사용자가 시스템 폴더 선택 창에서 직접 고른 폴더 (표준 폴더 밖도 가능) */
+    data class CustomFolder(val uri: android.net.Uri, val name: String)
+
+    val customFolders: StateFlow<List<CustomFolder>> =
+        com.eok.mp3recorder.data.PlayerPrefs.customFoldersFlow(app)
+            .map { set ->
+                val granted = app.contentResolver.persistedUriPermissions
+                    .filter { it.isWritePermission }
+                    .map { it.uri.toString() }
+                    .toSet()
+                set.filter { it in granted }
+                    .map { s ->
+                        val uri = android.net.Uri.parse(s)
+                        CustomFolder(uri, MediaOps.treeDisplayName(uri))
+                    }
+                    .sortedBy { it.name.lowercase() }
+            }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    private var treeMoveTrack: AudioTrack? = null
+
+    /** "다른 폴더 직접 선택…" 을 눌렀을 때 — 폴더 선택 창 결과가 올 때까지 대상 곡을 기억 */
+    fun beginTreeMove(track: AudioTrack) {
+        treeMoveTrack = track
+    }
+
+    /** 폴더 선택 창 결과. 권한을 영구 보관하고 목록에 기억한 뒤 이동 실행 */
+    fun onTreePicked(treeUri: android.net.Uri?, onNeedDeleteConfirm: (IntentSender) -> Unit) {
+        val track = treeMoveTrack
+        treeMoveTrack = null
+        if (treeUri == null || track == null) return
+        val app = getApplication<Application>()
+        runCatching {
+            app.contentResolver.takePersistableUriPermission(
+                treeUri,
+                android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                    android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            )
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            com.eok.mp3recorder.data.PlayerPrefs.addCustomFolder(app, treeUri.toString())
+        }
+        moveToTree(track, treeUri, onNeedDeleteConfirm)
+    }
+
+    fun moveToTree(track: AudioTrack, treeUri: android.net.Uri, onNeedDeleteConfirm: (IntentSender) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val result = MediaOps.moveToTree(getApplication(), track, treeUri)
+                result.newMediaId?.let { newId -> dao.remapMediaId(track.id, newId) }
+                refresh()
+                toast("이동 완료: ${MediaOps.treeDisplayName(treeUri)}")
+                result.pendingDelete?.let { sender ->
+                    withContext(Dispatchers.Main) { onNeedDeleteConfirm(sender) }
+                }
+            } catch (e: SecurityException) {
+                // 폴더 권한이 사라진 경우 목록에서 제거
+                com.eok.mp3recorder.data.PlayerPrefs.removeCustomFolder(getApplication(), treeUri.toString())
+                toast("폴더 접근 권한이 없습니다. 다시 선택해 주세요")
+            } catch (e: Exception) {
+                toast("이동 실패: ${e.message ?: e.javaClass.simpleName}")
+            }
+        }
+    }
+
+    fun forgetCustomFolder(folder: CustomFolder) {
+        viewModelScope.launch(Dispatchers.IO) {
+            com.eok.mp3recorder.data.PlayerPrefs.removeCustomFolder(getApplication(), folder.uri.toString())
+        }
+    }
+
     /** 시스템 허용 창을 거친 뒤 다시 실행할 작업 */
     private var pendingRetry: (() -> Unit)? = null
 

@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentSender
 import android.os.Build
+import android.provider.DocumentsContract
 import android.provider.MediaStore
 import android.util.Log
 
@@ -161,6 +162,66 @@ object MediaOps {
 
         val pendingDelete = deleteUri(context, track.contentUri)
         return MoveResult(newMediaId = ContentUris.parseId(newUri), pendingDelete = pendingDelete)
+    }
+
+    // ---- 직접 선택한 폴더(SAF 트리)로 이동 — 표준 폴더 제한을 받지 않는다 ----
+
+    /** 트리 URI에서 표시용 폴더 이름 ("primary:1_내 라이브러리" → "1_내 라이브러리") */
+    fun treeDisplayName(treeUri: android.net.Uri): String {
+        val docId = runCatching { DocumentsContract.getTreeDocumentId(treeUri) }.getOrNull() ?: return "폴더"
+        val rel = docId.substringAfter(':', "")
+        return rel.trimEnd('/').substringAfterLast('/').ifEmpty {
+            if (docId.startsWith("primary")) "내장 메모리" else "외장 메모리"
+        }
+    }
+
+    /** 문서 ID를 실제 경로로 (미디어 스캔용). "primary:a/b" → /storage/emulated/0/a/b */
+    private fun docIdToPath(docId: String): String? {
+        val volume = docId.substringBefore(':', "")
+        val rel = docId.substringAfter(':', "")
+        if (volume.isEmpty()) return null
+        return if (volume == "primary") "/storage/emulated/0/$rel" else "/storage/$volume/$rel"
+    }
+
+    /**
+     * 사용자가 시스템 폴더 선택 창에서 고른 폴더로 이동: 복사 → 미디어 스캔 → 원본 삭제.
+     * 원본 삭제에 승인이 필요하면 pendingDelete 반환.
+     */
+    fun moveToTree(context: Context, track: AudioTrack, treeUri: android.net.Uri): MoveResult {
+        val resolver = context.contentResolver
+        val parentDoc = DocumentsContract.buildDocumentUriUsingTree(
+            treeUri, DocumentsContract.getTreeDocumentId(treeUri)
+        )
+        val newDoc = DocumentsContract.createDocument(resolver, parentDoc, track.mimeType, track.displayName)
+            ?: throw IllegalStateException("선택한 폴더에 파일을 만들 수 없습니다")
+
+        try {
+            val input = resolver.openInputStream(track.contentUri)
+                ?: throw IllegalStateException("원본 파일을 열 수 없습니다")
+            val output = resolver.openOutputStream(newDoc)
+                ?: throw IllegalStateException("새 파일에 쓸 수 없습니다")
+            input.use { i -> output.use { o -> i.copyTo(o) } }
+        } catch (e: Exception) {
+            runCatching { DocumentsContract.deleteDocument(resolver, newDoc) }
+            throw e
+        }
+
+        // 새 파일이 라이브러리에 바로 보이도록 미디어 스캔 요청 (최대 10초 대기)
+        var newMediaId: Long? = null
+        val path = runCatching { docIdToPath(DocumentsContract.getDocumentId(newDoc)) }.getOrNull()
+        if (path != null) {
+            val latch = java.util.concurrent.CountDownLatch(1)
+            var scanned: android.net.Uri? = null
+            android.media.MediaScannerConnection.scanFile(
+                context, arrayOf(path), arrayOf(track.mimeType)
+            ) { _, uri -> scanned = uri; latch.countDown() }
+            latch.await(10, java.util.concurrent.TimeUnit.SECONDS)
+            // MediaStore의 files/audio 테이블 ID는 동일하다
+            newMediaId = scanned?.let { runCatching { ContentUris.parseId(it) }.getOrNull() }
+        }
+
+        val pendingDelete = deleteUri(context, track.contentUri)
+        return MoveResult(newMediaId = newMediaId, pendingDelete = pendingDelete)
     }
 
     /** 공유 시트 열기 (카톡·이메일 등) */
