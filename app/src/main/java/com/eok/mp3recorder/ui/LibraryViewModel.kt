@@ -75,10 +75,29 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
     val playlists = dao.playlistsWithCount()
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
-    /** 기기 내 오디오 폴더 목록 (파일 이동 대상 선택용) */
+    /** 파일 이동 대상 폴더 목록 — MediaStore가 허용하는 표준 폴더(Music 등) 아래만 */
     val folders: StateFlow<List<String>> = allTracks
-        .map { tracks -> tracks.map { it.relativePath }.distinct().sorted() }
+        .map { tracks ->
+            tracks.map { it.relativePath }
+                .distinct()
+                .filter { MediaOps.isMovableFolder(it) }
+                .sorted()
+        }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /** 시스템 허용 창을 거친 뒤 다시 실행할 작업 */
+    private var pendingRetry: (() -> Unit)? = null
+
+    fun retryPending() {
+        val action = pendingRetry
+        pendingRetry = null
+        action?.invoke()
+    }
+
+    fun cancelPending() {
+        pendingRetry = null
+        viewModelScope.launch { toast("허용하지 않아 변경하지 못했습니다") }
+    }
 
     val uiState: StateFlow<LibraryUiState> = combine(
         combine(allTracks, loading, filter) { t, l, f -> Triple(t, l, f) },
@@ -139,18 +158,34 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun rename(track: AudioTrack, newName: String) {
+    /**
+     * 이름 변경. 소유하지 않은 파일이면 [onNeedPermission]으로 시스템 허용 창을 띄우고,
+     * 허용되면 retryPending()으로 한 번 더 시도한다.
+     */
+    fun rename(
+        track: AudioTrack,
+        newName: String,
+        onNeedPermission: (IntentSender) -> Unit,
+        isRetry: Boolean = false,
+    ) {
         val trimmed = newName.trim()
         if (trimmed.isEmpty()) return
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                MediaOps.rename(getApplication(), track, trimmed)
-                refresh()
-                toast("이름을 변경했습니다")
-            } catch (e: SecurityException) {
-                toast("다른 앱이 만든 파일은 이름을 바꿀 수 없습니다")
+                val sender = MediaOps.rename(getApplication(), track, trimmed)
+                when {
+                    sender == null -> {
+                        refresh()
+                        toast("이름을 변경했습니다")
+                    }
+                    isRetry -> toast("권한이 없어 이름을 바꾸지 못했습니다")
+                    else -> {
+                        pendingRetry = { rename(track, newName, onNeedPermission, isRetry = true) }
+                        withContext(Dispatchers.Main) { onNeedPermission(sender) }
+                    }
+                }
             } catch (e: Exception) {
-                toast("이름 변경 실패: ${e.message}")
+                toast("이름 변경 실패: ${e.message ?: e.javaClass.simpleName}")
             }
         }
     }
@@ -180,17 +215,35 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
      * 복사 방식으로 이동된 경우 재생목록/즐겨찾기 참조를 새 ID로 갱신한다.
      * 원본 삭제에 시스템 승인이 필요하면 [onNeedConfirm]으로 IntentSender를 넘긴다.
      */
-    fun moveToFolder(track: AudioTrack, relativePath: String, onNeedConfirm: (IntentSender) -> Unit) {
+    fun moveToFolder(
+        track: AudioTrack,
+        relativePath: String,
+        onNeedPermission: (IntentSender) -> Unit,
+        onNeedDeleteConfirm: (IntentSender) -> Unit,
+        isRetry: Boolean = false,
+    ) {
         val target = relativePath.trim()
         if (target.isEmpty()) return
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val result = MediaOps.move(getApplication(), track, target)
+                val write = result.pendingWrite
+                if (write != null) {
+                    if (isRetry) {
+                        toast("권한이 없어 이동하지 못했습니다")
+                    } else {
+                        pendingRetry = {
+                            moveToFolder(track, relativePath, onNeedPermission, onNeedDeleteConfirm, isRetry = true)
+                        }
+                        withContext(Dispatchers.Main) { onNeedPermission(write) }
+                    }
+                    return@launch
+                }
                 result.newMediaId?.let { newId -> dao.remapMediaId(track.id, newId) }
                 refresh()
                 toast("이동 완료: ${target.trimEnd('/')}")
                 result.pendingDelete?.let { sender ->
-                    withContext(Dispatchers.Main) { onNeedConfirm(sender) }
+                    withContext(Dispatchers.Main) { onNeedDeleteConfirm(sender) }
                 }
             } catch (e: Exception) {
                 toast("이동 실패: ${e.message ?: e.javaClass.simpleName}")

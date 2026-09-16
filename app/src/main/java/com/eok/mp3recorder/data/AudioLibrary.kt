@@ -69,6 +69,9 @@ object AudioLibrary {
                 val displayName = cursor.getString(nameCol) ?: ""
                 val stem = displayName.substringBeforeLast('.')
                 val isOwned = cursor.getString(ownerCol) == myPackage
+                val relPath = cursor.getString(pathCol) ?: ""
+                // 재설치로 소유권을 잃은 예전 녹음도 녹음 폴더에 있으면 파일명을 표시
+                val mine = isOwned || relPath.contains("MP3녹음기")
                 tracks += AudioTrack(
                     id = id,
                     contentUri = ContentUris.withAppendedId(
@@ -76,7 +79,7 @@ object AudioLibrary {
                     ),
                     // 내 녹음 파일은 파일명을 그대로 표시 — 이름을 바꿔도 MediaStore TITLE은
                     // 갱신되지 않는 기기가 있어서, 파일명이 항상 진실이다
-                    title = if (isOwned) stem
+                    title = if (mine) stem
                     else rawTitle?.takeIf { it.isNotBlank() } ?: stem,
                     displayName = displayName,
                     artist = cursor.getString(artistCol)
@@ -85,7 +88,7 @@ object AudioLibrary {
                     durationMs = cursor.getLong(durCol),
                     sizeBytes = cursor.getLong(sizeCol),
                     dateAddedSec = cursor.getLong(dateCol),
-                    relativePath = cursor.getString(pathCol) ?: "",
+                    relativePath = relPath,
                     mimeType = cursor.getString(mimeCol) ?: "audio/mpeg",
                     isOwned = isOwned,
                 )

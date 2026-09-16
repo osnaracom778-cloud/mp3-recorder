@@ -89,6 +89,20 @@ fun LibraryScreen(
         if (result.resultCode == android.app.Activity.RESULT_OK) vm.refresh()
     }
 
+    // 소유하지 않은 파일(재설치 전 녹음 등) 수정 권한 요청 결과 → 허용되면 작업 재시도
+    val writeRequestLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) vm.retryPending()
+        else vm.cancelPending()
+    }
+    val requestWrite: (android.content.IntentSender) -> Unit = { sender ->
+        writeRequestLauncher.launch(androidx.activity.result.IntentSenderRequest.Builder(sender).build())
+    }
+    val requestDelete: (android.content.IntentSender) -> Unit = { sender ->
+        deleteConfirmLauncher.launch(androidx.activity.result.IntentSenderRequest.Builder(sender).build())
+    }
+
     LaunchedEffect(permissionGranted) {
         if (permissionGranted) vm.refresh()
     }
@@ -239,7 +253,7 @@ fun LibraryScreen(
             },
             confirmButton = {
                 Button(
-                    onClick = { vm.rename(track, name); renameTarget = null },
+                    onClick = { vm.rename(track, name, requestWrite); renameTarget = null },
                     enabled = name.isNotBlank()
                 ) { Text("변경") }
             },
@@ -257,7 +271,7 @@ fun LibraryScreen(
             title = { Text("폴더로 이동") },
             text = {
                 Column {
-                    Text("'${track.title}' 파일을 옮길 폴더를 선택하세요.",
+                    Text("'${track.title}' 파일을 옮길 폴더를 선택하세요.\n(표준 음악 폴더 아래로만 이동할 수 있습니다)",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                     folders.filter { it != track.relativePath }.forEach { folder ->
@@ -267,11 +281,7 @@ fun LibraryScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable {
-                                    vm.moveToFolder(track, folder) { sender ->
-                                        deleteConfirmLauncher.launch(
-                                            androidx.activity.result.IntentSenderRequest.Builder(sender).build()
-                                        )
-                                    }
+                                    vm.moveToFolder(track, folder, requestWrite, requestDelete)
                                     moveTarget = null
                                 }
                                 .padding(vertical = 10.dp)
@@ -289,11 +299,7 @@ fun LibraryScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        vm.moveToFolder(track, "Music/${newFolder.trim()}") { sender ->
-                            deleteConfirmLauncher.launch(
-                                androidx.activity.result.IntentSenderRequest.Builder(sender).build()
-                            )
-                        }
+                        vm.moveToFolder(track, "Music/${newFolder.trim()}", requestWrite, requestDelete)
                         moveTarget = null
                     },
                     enabled = newFolder.isNotBlank()

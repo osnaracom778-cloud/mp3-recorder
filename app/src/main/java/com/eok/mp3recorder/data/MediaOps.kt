@@ -16,17 +16,43 @@ object MediaOps {
     private const val TAG = "MediaOps"
 
     /**
-     * 이름 변경. 이 앱이 만든 파일(내 녹음)은 바로 성공한다.
-     * 다른 앱 파일이면 SecurityException — 호출자가 안내 메시지를 띄운다.
+     * 이름 변경. 바로 성공하면 null.
+     * 앱이 소유하지 않은 파일(재설치로 소유권을 잃은 예전 녹음 등)이면 시스템 허용 창용
+     * IntentSender를 반환 — UI가 띄우고 사용자가 허용하면 다시 호출한다.
      */
-    fun rename(context: Context, track: AudioTrack, newName: String) {
+    fun rename(context: Context, track: AudioTrack, newName: String): IntentSender? {
         val ext = track.displayName.substringAfterLast('.', "mp3")
         val values = ContentValues().apply {
             put(MediaStore.Audio.Media.DISPLAY_NAME, "$newName.$ext")
             put(MediaStore.Audio.Media.TITLE, newName)
         }
-        val updated = context.contentResolver.update(track.contentUri, values, null, null)
-        if (updated <= 0) throw IllegalStateException("이름을 변경하지 못했습니다")
+        return try {
+            val updated = context.contentResolver.update(track.contentUri, values, null, null)
+            if (updated <= 0) throw IllegalStateException("이름을 변경하지 못했습니다")
+            null
+        } catch (e: SecurityException) {
+            writeRequestSender(context, track.contentUri, e)
+        }
+    }
+
+    /** 소유하지 않은 파일 수정 권한을 사용자에게 요청하는 IntentSender */
+    private fun writeRequestSender(context: Context, uri: android.net.Uri, e: SecurityException): IntentSender {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            MediaStore.createWriteRequest(context.contentResolver, listOf(uri)).intentSender
+        } else {
+            (e as? RecoverableSecurityException)?.userAction?.actionIntent?.intentSender ?: throw e
+        }
+    }
+
+    /** MediaStore의 영문 오류를 사용자용 문구로 */
+    private fun friendlyMessage(e: Exception): String {
+        val msg = e.message ?: ""
+        return when {
+            msg.contains("Primary directory", ignoreCase = true) ||
+                msg.contains("not allowed", ignoreCase = true) ->
+                "표준 음악 폴더(Music, Recordings 등) 아래로만 이동할 수 있습니다"
+            else -> msg.ifBlank { e.javaClass.simpleName }
+        }
     }
 
     /**
@@ -51,24 +77,39 @@ object MediaOps {
         }
     }
 
+    /** 오디오 파일을 넣을 수 있는 표준 최상위 폴더 (MediaStore 제약) */
+    val ALLOWED_PRIMARY_DIRS = setOf(
+        "Music", "Recordings", "Podcasts", "Audiobooks", "Alarms", "Notifications", "Ringtones"
+    )
+
+    fun isMovableFolder(relativePath: String): Boolean =
+        relativePath.substringBefore('/') in ALLOWED_PRIMARY_DIRS
+
     /** 폴더 이동 결과 */
     data class MoveResult(
         /** 복사 방식으로 이동되어 MediaStore ID가 바뀐 경우 새 ID */
         val newMediaId: Long? = null,
         /** 원본 삭제에 시스템 승인이 필요한 경우 */
         val pendingDelete: IntentSender? = null,
+        /** 파일 수정 권한(소유하지 않은 파일)이 필요한 경우 — 허용 후 다시 move() */
+        val pendingWrite: IntentSender? = null,
     )
 
     /**
      * 다른 폴더로 이동. [newRelativePath] 예: "Music/회의녹음"
      *
      * 1차: RELATIVE_PATH 갱신 (MediaStore가 파일을 옮김 — 가장 빠르고 ID 유지)
-     * 2차: 기기/파일에 따라 1차가 거부되면 새 위치에 복사 후 원본 삭제로 대체
-     *      (어떤 기기에서도 동작하지만 ID가 바뀌므로 호출자가 DB 참조를 갱신해야 함)
+     *   - 소유하지 않은 파일이면 pendingWrite 반환 → 사용자 허용 후 재시도
+     *   - 표준 폴더 밖 등 잘못된 대상이면 예외
+     * 2차: 그 밖의 이유로 거부되면 새 위치에 복사 후 원본 삭제로 대체
+     *      (ID가 바뀌므로 호출자가 DB 참조를 갱신해야 함)
      */
     fun move(context: Context, track: AudioTrack, newRelativePath: String): MoveResult {
         val normalized = newRelativePath.trim().trim('/') + "/"
         if (normalized == track.relativePath) return MoveResult()
+        if (!isMovableFolder(normalized)) {
+            throw IllegalArgumentException("표준 음악 폴더(Music, Recordings 등) 아래로만 이동할 수 있습니다")
+        }
 
         try {
             val values = ContentValues().apply {
@@ -77,6 +118,10 @@ object MediaOps {
             val updated = context.contentResolver.update(track.contentUri, values, null, null)
             if (updated > 0) return MoveResult()
             Log.w(TAG, "RELATIVE_PATH update returned 0, falling back to copy")
+        } catch (e: SecurityException) {
+            return MoveResult(pendingWrite = writeRequestSender(context, track.contentUri, e))
+        } catch (e: IllegalArgumentException) {
+            throw IllegalArgumentException(friendlyMessage(e))
         } catch (e: Exception) {
             Log.w(TAG, "RELATIVE_PATH update failed (${e.javaClass.simpleName}: ${e.message}), falling back to copy")
         }
@@ -93,8 +138,11 @@ object MediaOps {
             put(MediaStore.Audio.Media.IS_PENDING, 1)
         }
         val collection = MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
-        val newUri = resolver.insert(collection, values)
-            ?: throw IllegalStateException("새 위치에 파일을 만들지 못했습니다")
+        val newUri = try {
+            resolver.insert(collection, values)
+        } catch (e: IllegalArgumentException) {
+            throw IllegalArgumentException(friendlyMessage(e))
+        } ?: throw IllegalStateException("새 위치에 파일을 만들지 못했습니다")
 
         try {
             val input = resolver.openInputStream(track.contentUri)
